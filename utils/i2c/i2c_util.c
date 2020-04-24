@@ -160,7 +160,7 @@ int main(int argc, char** argv)
 		}
     }
 	/* i2c read/write reg */
-	else {
+	else if(strcmp(argv[1], "read") == 0 || strcmp(argv[1], "write") == 0){
 		if(strcmp(argv[1], "read") == 0){
 			if(argc < 5 || argc > 6) {
 				help(HELP_READ_REG);
@@ -256,7 +256,9 @@ int main(int argc, char** argv)
         {
             printf("ERROR: Invalid command\n\n");
         }
-    }
+    }else{
+		help(HELP_ALL);
+	}
     return 1;
 }
 
