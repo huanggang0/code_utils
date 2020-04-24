@@ -22,67 +22,103 @@
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE.
 
- */
+*/
 
 #include "i2c_util.h"
 
+static bool i2c_read_test(int fd,uint8_t i2c_addr){
+	struct i2c_rdwr_ioctl_data data;
+	struct i2c_msg msgs[2];
+	uint8_t buf[sizeof(uint8_t) * 3] = {0}; // max 24bit
+	// register parameters
+	msgs[0].addr = i2c_addr;
+	msgs[0].flags = 0;
+	msgs[0].len = 1;
+	msgs[0].buf = buf;
+
+	// expected value parameters
+	msgs[1].addr = i2c_addr;
+	msgs[1].flags = I2C_M_RD;
+	msgs[1].len = 1;
+	msgs[1].buf = buf;
+
+	//reg address 0x00
+	buf[0] = (uint8_t)(0x00);
+
+	// read
+	data.msgs = msgs;
+	data.nmsgs = 2;
+	if (ioctl(fd, I2C_RDWR, &data) < 0)
+	{
+		//printf("ERROR: Read failure\n\n");
+		//close(file_i2c);
+		return false;
+	}
+	return true;
+}
+
 bool i2c_scan(uint8_t bus)
 {
-    uint8_t buffer[4];
-    char fname[15];
-    int file_i2c;
+	uint8_t buffer[4];
+	char fname[15];
+	int file_i2c;
 
-    // create filename
-    sprintf(fname, "/dev/i2c-%d", bus);
+	// create filename
+	sprintf(fname, "/dev/i2c-%d", bus);
 
-    printf("\n%s:\n", fname);
+	printf("\n%s:\n", fname);
 
 	if(access(fname,R_OK) == -1){
 		printf("i2c dev : %s not exist\n",fname);
 		return false;
 	}
 
-    // open device file
-    if ((file_i2c = open(fname, O_RDWR | O_NONBLOCK)) < 0)
-    {
-        printf("ERROR: Failed to open the i2c bus. Try 'sudo'\n\n");
-        return false;
-    }
+	// open device file
+	if ((file_i2c = open(fname, O_RDWR | O_NONBLOCK)) < 0)
+	{
+		printf("ERROR: Failed to open the i2c bus. Try 'sudo'\n\n");
+		return false;
+	}
 
-    // run through all the possible I2C addresses (0x03-0x77) and show the
-    // ones accupied by a device driver and the ones in user space
-    printf("     0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n");
-    for (uint8_t addr = 0; addr < 0x7F; addr += 16)
-    {
-        printf("%02X: ", addr);
-        for (uint8_t offset = 0; offset < 16; offset++)
-        {
-            if ((addr + offset) >= 0x03 && (addr + offset) <= 0x77)
-            {
-                if (ioctl(file_i2c, I2C_SLAVE, addr + offset) < 0)
-                {
-                    printf("DD-");   /* device + driver */
-                }
-                else
-                {
-                    uint8_t length = 1;
-                    if (read(file_i2c, buffer, length) != length)
-                        printf("-- ");                        /* nothing here */
-                    else
-                        printf("%02X ", addr + offset);       /* available */
-                }
-            }
-            else
-                printf("   ");
-        }
-        printf("\n");
-    }
-    printf("    --=No device  DD=Device+Driver  03-77=Available\n");
+	// run through all the possible I2C addresses (0x03-0x77) and show the
+	// ones accupied by a device driver and the ones in user space
+	printf("     0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n");
+	for (uint8_t addr = 0; addr < 0x7F; addr += 16)
+	{
+		printf("%02X: ", addr);
+		for (uint8_t offset = 0; offset < 16; offset++)
+		{
+			if ((addr + offset) >= 0x01 && (addr + offset) <= 0x7e)
+			{
+				if (ioctl(file_i2c, I2C_SLAVE, addr + offset) < 0)
+				{
+					printf("DD-");   /* device + driver */
+				}
+				else
+				{
+					uint8_t length = 1;
+					/* scan way 1 : not alway available */
+					if (read(file_i2c, buffer, length) == length){
+						printf("%02X ", addr + offset);
+						/* scan way 2 : in case of way 1 failure */
+					}else if(i2c_read_test(file_i2c,addr + offset) == true){
+						printf("%02X ", addr + offset);
+					}
+					else
+						printf("-- ");
+				}
+			}
+			else
+				printf("   ");
+		}
+		printf("\n");
+	}
+	printf("    --=No device  DD=Device+Driver  03-77=Available\n");
 
-    close(file_i2c);
-    printf("\n");
+	close(file_i2c);
+	printf("\n");
 
-    return true;
+	return true;
 }
 
 
