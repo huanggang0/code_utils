@@ -1,0 +1,47 @@
+old_version = @GIT_COMMIT_HASH@
+old_topic   = @GIT_COMMIT_TOPIC@
+old_date    = @GIT_COMMIT_DATE@
+old_status  = @GIT_COMMIT_STATUS@
+
+git_cmd_exist  = $(shell which git | grep "git" | wc -c)
+git_repo_exist = $(shell git log -1 | grep "commit" | wc -c)
+
+
+ifeq ($(git_cmd_exist), 0)
+
+else ifeq ($(git_repo_exist), 0)
+
+else
+commit_id   = $(shell git log -1 --pretty=format:%H)
+branch      = $(shell git branch | grep '*')
+new_version = git ${branch}: ${commit_id}
+
+topic       = $(shell git log -1  --pretty=%s)
+new_topic   = git topic: ${topic}
+
+date        = $(shell git log -1 --pretty=%cd)
+new_date    = git date: ${date}
+
+status      = $(shell git status -s | wc -l)
+new_status  = git status: ${status} files uncommited
+endif
+
+GIT_DETAIL:
+ifneq ($(git_repo_exist), 0)
+	@echo "git_cmd_exist   = $(git_cmd_exist)"
+	@echo "git_repo_exist  = $(git_repo_exist)"
+	@echo "new_date   = $(new_date)"
+	@echo "new_version= $(new_version)"
+	@echo "new_topic  = $(new_topic)"
+	@echo "new_statuc = $(new_status)"
+	@cp inc/version_template.h  inc/version.h
+	@sed -i "s/$(old_version)/$(new_version)/g" inc/version.h
+	@sed -i "s/$(old_topic)/$(new_topic)/g"     inc/version.h
+	@sed -i "s/$(old_date)/$(new_date)/g"       inc/version.h
+	@sed -i "s/$(old_status)/$(new_status)/g"   inc/version.h
+	@echo "\033[33mGet git commit id ok\033[0m"
+else
+	echo "no git repo exist"
+endif
+
+.PHONY : GIT_DETAIL
